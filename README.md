@@ -38,6 +38,14 @@ Keep the spare phone on a charger.
    6-digit code and the ports. Keep that screen open until it says it's connected.
 5. If the phone asks **"Allow debugging?"**, tick Always allow and tap Allow.
 
+What it looks like on our spare Samsung:
+
+<p>
+  <img src="docs/1-dev-options.png" width="250" alt="Developer options on, with Wireless debugging switched on">
+  <img src="docs/3-auth-timeout.png" width="250" alt="Wireless debugging and Disable adb authorization timeout both on">
+  <img src="docs/2-wireless-debugging.png" width="250" alt="The Wireless debugging screen with Pair device with pairing code">
+</p>
+
 The agent then moves the connection to a fixed port (5555), so a dropped connection comes back on
 its own.
 
