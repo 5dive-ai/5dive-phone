@@ -4,8 +4,8 @@
   <img src="docs/hero.webp" width="640" alt="A scrappy robot on a sofa, using a phone">
 </p>
 
-**A spare Android phone for your AI agents.** They read the screen, tap and type in apps that
-have no website, and ask you before they pay.
+**A spare Android phone for your AI agents.** They read the screen, tap and type in any Android
+app, and ask you before they pay.
 
 Works with any agent 5dive runs: Claude Code, Codex and more. Free and open source.
 
@@ -14,9 +14,9 @@ Works with any agent 5dive runs: Claude Code, Codex and more. Free and open sour
 ```
   Your server (agent)  ──── Tailscale ────  Spare Android phone
                                             on a charger
-  "reply to Sam on WhatsApp"
+  "post our video on TikTok with this week's trending sound"
      1. reads the screen
-     2. taps and types        "On my way", Send
+     2. taps and types        picks the sound, writes the caption
      3. about to pay?         it asks you first
 ```
 
@@ -24,11 +24,11 @@ Works with any agent 5dive runs: Claude Code, Codex and more. Free and open sour
 
 - **Testing the app your coding agent just built.** Onboarding, permissions, the button the
   keyboard hides. Each bug comes back with a screenshot and the steps.
-- **Watching rivals' apps.** Every Monday: the paywall, the prices, the trial, what changed.
+- **Watching rivals' apps.** Every Monday: the paywall, the prices, the trial, and the discounts
+  they only show inside the app.
 - **Checking ad links.** It taps every link on a real phone before the campaign goes live.
 - **Posts your scheduler can't finish.** A trending sound from TikTok's own library, a poll on
   an Instagram Story.
-- **Apps with no website.** WhatsApp Business, and anything else that only lives on a phone.
 
 ## Install
 
