@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "5dive-phone",
+  "description": "The 5dive phone plugin, published from its own repository. One plugin, one repo — the shape `5dive plugin add <owner>/<repo>` was built for.",
+  "owner": {
+    "name": "5dive",
+    "email": "support@5dive.com"
+  },
+  "plugins": [
+    {
+      "name": "phone",
+      "description": "Your agent uses apps on a spare Android phone you set aside for it (WhatsApp Business, Instagram, a bank app): it reads the screen, taps and types over your Tailscale network, with nothing installed on the phone. Sending, posting, deleting and paying follow the browser's rules: paying asks you first; careful makes all four ask.",
+      "category": "automation",
+      "source": "./phone",
+      "homepage": "https://github.com/5dive-ai/5dive-phone"
+    }
+  ]
+}

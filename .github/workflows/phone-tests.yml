@@ -1,0 +1,32 @@
+name: phone plugin
+
+# The whole repo is one plugin, so there is no path filter: any push or PR here
+# touches phone.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # Plain bash with a FAKE adb first on PATH: no phone, no Android SDK. It drives
+      # the shipped bin/phone and lib/ui.py.
+      - name: phone plugin harness (fake adb)
+        run: bash tests/phone_unit.sh
+      # A manifest that does not parse breaks `5dive plugin add` at install time,
+      # where nobody is watching.
+      - name: manifests parse
+        run: |
+          jq -e . .claude-plugin/marketplace.json > /dev/null
+          jq -e . phone/.claude-plugin/plugin.json > /dev/null
+      # Contract §1: the manifest name must equal its folder name, and the
+      # marketplace `source` must name that same folder (DIVE-4386, trap D).
+      - name: manifest name matches its folder and the marketplace source
+        run: |
+          test "$(jq -r .name phone/.claude-plugin/plugin.json)" = phone
+          test "$(jq -r '.plugins|length' .claude-plugin/marketplace.json)" = 1
+          test "$(jq -r '.plugins[]|select(.name=="phone")|.source' .claude-plugin/marketplace.json)" = ./phone
