@@ -5,6 +5,25 @@ One plugin, one repo, one changelog. The 0.1.0 entry was carried over from
 
 ## Unreleased
 
+## 0.2.0 — typing in any language; a restart needs one switch, not a port (DIVE-9242)
+
+- `type` takes any text: Cyrillic, accents, emoji, line breaks. Plain English text still goes through
+  adb's `input text`; anything else is pasted. `lib/type.dex` (our own code, built reproducibly from
+  `android/` by `android/build.sh`, sha256 in `lib/type.dex.sha256`) is copied to
+  `/data/local/tmp` for that step, run with Android's `app_process` as the adb shell user to set the
+  clipboard (marked sensitive, without the "Copied" panel), a Paste key types it, then the clipboard is
+  emptied and the file deleted. No app is installed. A pasted line break never sends. A type step is
+  capped at 4000 characters. Text containing a literal `%s`, which `input text` turned into a space, is
+  pasted too.
+- After a restart the owner only switches Wireless debugging back on: the next command finds the port
+  it picked (`lib/ports.py` tries the phone's ephemeral ports, a few hundred at a time), connects with
+  the existing pairing and pins 5555 again. `connect <ip>` with no port does the same. Exit 69 now
+  tells a phone that is off or off Tailscale apart from one whose Wireless debugging is still off.
+- Websites are no longer listed as a limit: the README says they go through the agent's own browser.
+- Harness: 116 arms (19 new; 19 red on 0.1.1). Live on the redroid rig (Android 13 and 15): "Мария Ž 👋"
+  typed into Contacts and read back, nothing left in `/data/local/tmp`; adbd moved to a random port
+  was found in 8.5 s and pinned back to 5555.
+
 ## 0.1.1 — the phone plugin's own repo (DIVE-9230)
 
 - The plugin now lives at `5dive-ai/5dive-phone` and installs with

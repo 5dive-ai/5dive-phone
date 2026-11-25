@@ -3,7 +3,7 @@
 **Give your AI agent a spare Android phone. It uses the apps that only live on a phone.**
 
 WhatsApp Business, Instagram, anything without a website. The agent reads the screen, taps and
-types. Nothing is installed on the phone.
+types, in any language. No app is installed on the phone.
 
 The full walkthrough, with five jobs it does: [our blog post](https://blog.5dive.ai/blog/ai-agent-control-android-phone/).
 
@@ -37,7 +37,7 @@ Keep the spare phone on a charger.
 3. In **Developer options**, turn on **Stay awake** and **Disable adb authorization timeout**
    (Android 11+). Set **Screen lock** to None or Swipe.
 4. Turn on **Wireless debugging** and tap **Pair device with pairing code**. Give your agent the
-   6-digit code and the ports. Keep that screen open until it says it's connected.
+   6-digit code and the port shown under it. Keep that screen open until it says it's connected.
 5. If the phone asks **"Allow debugging?"**, tick Always allow and tap Allow.
 
 What it looks like on our spare Samsung:
@@ -50,6 +50,9 @@ What it looks like on our spare Samsung:
 
 The agent then moves the connection to a fixed port (5555), so a dropped connection comes back on
 its own.
+
+Typing beyond plain English (emoji, accents, Cyrillic) copies a 4 KB helper of ours to the phone's
+temp folder for that moment and deletes it after. It is not an app: no icon, nothing left behind.
 
 ## You decide what it may do alone
 
@@ -68,13 +71,14 @@ sudo 5dive phone approvals policy set careful
 An ask reaches you as an Approve button in Telegram, and nothing runs until you tap it. Every
 step the agent takes is logged on your server.
 
+Websites go through the agent's own browser on your server
+([5dive browser](https://github.com/5dive-ai/5dive-browser)): the phone is for apps.
+
 ## Limits
 
 - **A locked phone can't be used.** Set the screen lock to None or Swipe.
-- **After the phone restarts**, turn Wireless debugging on again and send your agent the new port.
-  No new code is needed.
-- **Typing is plain English letters only** for now: no emoji, accents or Cyrillic.
-- **Websites** go through 5dive browser on the server. They read badly on the phone.
+- **After the phone restarts**, turn Wireless debugging on again and tell your agent. It finds
+  the phone by itself: no port, no new code.
 - **Android only.** iPhone is not supported.
 - **Some apps refuse to run** when developer mode is on, banking apps especially. Automated taps
   can also break an app's terms: check them before you hand the app to your agent.

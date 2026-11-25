@@ -3,7 +3,8 @@
 # What it pins: the screen reads as refs, a Send/Pay/Delete tap is checked against
 # the owner's policy BEFORE any step runs, a grant is bound to the exact steps and
 # spent once, the policy file counts only when the granting uid owns it, and a
-# phone that stopped answering says what to ask the owner.
+# phone that stopped answering says what to ask the owner, and text in any
+# language is pasted through lib/type.dex (DIVE-9242).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PHONE="$ROOT/phone/bin/phone"
@@ -17,9 +18,11 @@ check() { local name="$1"; shift; if "$@"; then ok "$name"; else bad "$name"; fi
 
 export FIVEDIVE_PHONE_ADB="$FIX/fake-adb" FAKE_ADB_UI="$FIX/chat.xml" FAKE_ADB_LOG="$T/input.log" FAKE_ADB_CALLS="$T/calls.log"
 export FIVEDIVE_PHONE_HOME="$T/home" FIVEDIVE_PHONE_APPROVAL_DIR="$T/approvals" FIVEDIVE_PHONE_APPROVAL_POLICY="$T/policy.json"
-export FIVEDIVE_PHONE_GRANT_UID="$(id -u)" FIVEDIVE_PHONE_STEP_GAP=0 FIVEDIVE_PHONE_OPEN_WAIT=0
+export FIVEDIVE_PHONE_GRANT_UID="$(id -u)" FIVEDIVE_PHONE_STEP_GAP=0 FIVEDIVE_PHONE_OPEN_WAIT=0 FIVEDIVE_PHONE_TCPIP_WAIT=0
+# The port search after a restart really scans: keep it to a few ports and a short wait.
+export FIVEDIVE_PHONE_PORTS=40000-40010 FIVEDIVE_PHONE_SCAN_WAIT=0.3
 # No `5dive` on PATH: the owner-ask relay is not reachable here, so the fallback text shows.
-mkdir -p "$T/bin"; for b in bash jq python3 sha256sum timeout stat head od tr cut sed grep awk sort tail cat mkdir chmod mv rm date sleep seq id getent mktemp basename dirname printf env ls wc; do
+mkdir -p "$T/bin"; for b in bash jq python3 sha256sum timeout stat head od tr cut sed grep awk sort tail cat mkdir chmod mv rm date sleep seq id getent mktemp basename dirname printf env ls wc base64 cat kill; do
   p="$(command -v "$b")" && ln -sf "$p" "$T/bin/$b"; done
 export PATH="$T/bin"
 policy() { printf '%s\n' "$1" > "$T/policy.json"; }
@@ -50,6 +53,31 @@ check "a phone that stopped answering exits 69" [ $rc -eq 69 ]
 check "  and says what to ask the owner (Wireless debugging, new port)" grep -q 'Wireless debugging' <<<"$out"
 out="$(FAKE_ADB_STATE=unauthorized "$PHONE" snapshot 2>&1)"; rc=$?
 check "an unallowed server asks the owner to tap Allow" grep -q 'tap Allow' <<<"$out"
+
+# ---- after a restart the new port is found, nobody reads it off the screen (DIVE-9242) ----
+# A real listener on 127.0.0.1 stands in for the phone's Wireless debugging port.
+python3 -c 'import socket,time; s=socket.socket(); s.bind(("127.0.0.1",0)); s.listen(8); print(s.getsockname()[1], flush=True); time.sleep(120)' > "$T/lport" &
+LPID=$!; for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -s "$T/lport" ]] && break; sleep 0.2; done
+LP="$(cat "$T/lport")"; RANGE="$((LP - 20))-$((LP + 20))"
+out="$(python3 "$ROOT/phone/lib/ports.py" 127.0.0.1 "$RANGE")"; rc=$?
+check "ports.py finds the open port (exit 0)" bash -c '[ "$1" -eq 0 ] && grep -qx "$2" <<<"$3"' _ "$rc" "$LP" "$out"
+out="$(FIVEDIVE_PHONE_SCAN_WAIT=0.3 python3 "$ROOT/phone/lib/ports.py" 192.0.2.1 40000-40010)"; rc=$?
+check "ports.py says a host that never answers is silent (exit 3)" [ $rc -eq 3 ]
+echo 127.0.0.1:5555 > "$T/home/device"; : > "$T/listen"
+out="$(FAKE_ADB_LISTEN="$LP" FAKE_ADB_LISTEN_FILE="$T/listen" FIVEDIVE_PHONE_PORTS="$RANGE" "$PHONE" snapshot 2>&1)"; rc=$?
+check "restarted phone, Wireless debugging back on: the command goes ahead (exit 0)" [ $rc -eq 0 ]
+check "  it says it found the phone again" grep -q 'found it again at 127.0.0.1:5555' <<<"$out"
+check "  connected on the found port, then pinned 5555 again" bash -c 'grep -qx "connect 127.0.0.1:$2" "$1" && grep -qx "tcpip 5555" "$1" && [ "$(cat "$3")" == 127.0.0.1:5555 ]' _ "$T/calls.log" "$LP" "$T/home/device"
+: > "$T/listen"
+out="$(FAKE_ADB_LISTEN=1 FAKE_ADB_LISTEN_FILE="$T/listen" FIVEDIVE_PHONE_PORTS="$RANGE" "$PHONE" snapshot 2>&1)"; rc=$?
+check "restarted phone, Wireless debugging still off: exit 69" [ $rc -eq 69 ]
+check "  asks the owner only to turn it on, no port to send" bash -c 'grep -q "turn it on, then tell me" <<<"$1" && grep -q "found on its own" <<<"$1" && ! grep -q "tell me the port" <<<"$1"' _ "$out"
+out="$(FAKE_ADB_LISTEN="$LP" FAKE_ADB_LISTEN_FILE="$T/listen" FIVEDIVE_PHONE_PORTS="$RANGE" "$PHONE" connect 127.0.0.1 2>&1)"; rc=$?
+check "connect <ip> with no port finds it and pins 5555" bash -c '[ "$1" -eq 0 ] && grep -q "at 127.0.0.1:5555" <<<"$2"' _ "$rc" "$out"
+kill "$LPID" 2>/dev/null
+echo 192.0.2.7:5555 > "$T/home/device"
+out="$(FAKE_ADB_STATE=offline "$PHONE" snapshot 2>&1)"; rc=$?
+check "a phone that does not answer at all: exit 69, is it on and on Tailscale" bash -c '[ "$1" -eq 69 ] && grep -q "does not answer at all" <<<"$2"' _ "$rc" "$out"
 
 # ---- snapshot ----
 snap="$("$PHONE" snapshot)"
@@ -154,10 +182,26 @@ out="$("$PHONE" act --steps='[{"op":"tap","ref":"button/Send"}]' 2>&1)"; rc=$?
 check "standard: plain button/Send still runs (exit 0, tapped)" bash -c '[ "$1" -eq 0 ] && grep -q "input tap 990 2160" "$2"' _ "$rc" "$T/input.log"
 
 # ---- refusals and the rest ----
-out="$("$PHONE" act --steps='[{"op":"type","text":"héllo"}]' 2>&1)"; rc=$?
-check "non-ASCII text is refused with exit 2" [ $rc -eq 2 ]
-out="$("$PHONE" act --steps='[{"op":"type","text":"a\nb"}]' 2>&1)"; rc=$?
-check "a line break in text is refused (Enter is its own step)" [ $rc -eq 2 ]
+# ---- typing beyond plain English letters is pasted (DIVE-9242) ----
+check "lib/type.dex is the build of android/src (its recorded sha256)" bash -c 'cd "$1/phone/lib" && sha256sum -c --quiet type.dex.sha256' _ "$ROOT"
+rm -f "$T/policy.json"
+for t in "Привет, как дела?" "café ¡olé!" "On my way 👋" "Zeile eins
+Zeile zwei" "50%sale"; do
+  reset_log
+  js="$(jq -nc --arg e "$entry" --arg t "$t" '[{op:"type",ref:$e,text:$t}]')"
+  out="$("$PHONE" act --steps="$js" 2>&1)"; rc=$?
+  check "type \"${t//$'\n'/\\n}\" pastes it whole (exit 0)" bash -c '[ "$1" -eq 0 ] && [ "$(grep -c "^clip " "$2")" -eq 1 ] && [ "$(sed -n "/^clip /,\$p" "$2" | sed -n "1,/input keyevent 279/p" | sed "1s/^clip //;\$d")" == "$3" ]' _ "$rc" "$T/input.log" "$t"
+  check "  helper copied first, PASTE key after the clip, clipboard emptied and helper deleted last" bash -c '
+    l="$(grep -nE "^(push|clip |input keyevent 279|clip-clear)" "$1" | cut -d: -f2- | cut -c1-14 | tr "\n" "|")"
+    [[ "$l" == "push /data/loc|clip "*"|input keyevent|clip-clear /da|" ]] && ! grep -q "input text" "$1"' _ "$T/input.log"
+done
+reset_log
+out="$(FAKE_ADB_CLIP=refuse "$PHONE" act --steps="[{\"op\":\"type\",\"ref\":\"$entry\",\"text\":\"Привет\"}]" 2>&1)"; rc=$?
+check "a phone that refuses the clipboard fails the step (exit 1), says why, no PASTE" bash -c '[ "$1" -eq 1 ] && grep -q "refused the clipboard" <<<"$2" && ! grep -q "keyevent 279" "$3"' _ "$rc" "$out" "$T/input.log"
+check "  and still deletes the helper" grep -q '^clip-clear /data/local/tmp/.5dive-type.dex' "$T/input.log"
+long="$(head -c 4001 /dev/zero | tr '\0' 'a')"
+out="$("$PHONE" act --steps="[{\"op\":\"type\",\"text\":\"$long\"}]" 2>&1)"; rc=$?
+check "a type step over 4000 characters is refused with exit 2" [ $rc -eq 2 ]
 out="$("$PHONE" act --steps='[{"op":"fly"}]' 2>&1)"; rc=$?
 check "an unknown op is refused" [ $rc -eq 2 ]
 reset_log
