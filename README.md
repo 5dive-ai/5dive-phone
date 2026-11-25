@@ -71,12 +71,14 @@ sudo 5dive phone approvals policy set careful
 An ask reaches you as an Approve button in Telegram, and nothing runs until you tap it. Every
 step the agent takes is logged on your server.
 
+Websites go through the agent's own browser on your server
+([5dive browser](https://github.com/5dive-ai/5dive-browser)): the phone is for apps.
+
 ## Limits
 
 - **A locked phone can't be used.** Set the screen lock to None or Swipe.
 - **After the phone restarts**, turn Wireless debugging on again and tell your agent. It finds
   the phone by itself: no port, no new code.
-- **Websites** go through 5dive browser on the server. They read badly on the phone.
 - **Android only.** iPhone is not supported.
 - **Some apps refuse to run** when developer mode is on, banking apps especially. Automated taps
   can also break an app's terms: check them before you hand the app to your agent.
