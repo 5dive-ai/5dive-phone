@@ -5,6 +5,8 @@
 WhatsApp Business, Instagram, anything without a website. The agent reads the screen, taps and
 types. Nothing is installed on the phone.
 
+The full walkthrough, with five jobs it does: [our blog post](https://blog.5dive.ai/blog/ai-agent-control-android-phone/).
+
 ```
   Your server (agent)  ──── Tailscale ────  Spare Android phone
                                             on a charger
