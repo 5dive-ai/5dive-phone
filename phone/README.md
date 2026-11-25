@@ -1,7 +1,7 @@
 # phone
 
-Your agent uses apps on a spare Android phone: WhatsApp Business, Instagram, a bank app,
-anything that exists only on a phone.
+Your agent uses apps on a spare Android phone: TikTok, Instagram, your own app's test build,
+anything a person would tap through by hand.
 
 ```
 5dive phone snapshot --interactive     # the screen as controls: [e3] button "Send"  ⚠ send
@@ -12,8 +12,8 @@ anything that exists only on a phone.
 ## How it reaches the phone
 
 adb, Android's own debugging bridge, over the phone's Tailscale address. The screen is read
-with uiautomator and taps and typing go through `input`; both ship inside Android. No app is
-installed on the phone and nothing comes from Google Play.
+with uiautomator and taps and typing go through `input`; both ship inside Android. Nothing of
+ours is installed on the phone; Tailscale is the only app it needs.
 
 Text in any language, emoji and line breaks are pasted: `lib/type.dex` (4 KB, our own code,
 source in `android/`) is copied to the phone's temp folder for that one step, puts the text on
