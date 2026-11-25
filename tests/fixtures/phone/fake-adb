@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # A stand-in for adb: answers what `5dive phone` asks and records every input it
-# would have sent to the phone in $FAKE_ADB_LOG. $FAKE_ADB_STATE=device|offline|unauthorized.
-[[ "${1:-}" == -s ]] && shift 2
+# would have sent to the phone in $FAKE_ADB_LOG (a paste as `clip <text>`). $FAKE_ADB_STATE=device|offline|unauthorized.
+# $FAKE_ADB_LISTEN (ports, space-separated) makes the phone answer adb on those
+# ports only, as after a restart; `tcpip 5555` adds 5555 in $FAKE_ADB_LISTEN_FILE.
+TGT=""; [[ "${1:-}" == -s ]] && { TGT="$2"; shift 2; }
+listens() { [[ " ${FAKE_ADB_LISTEN} $(cat "${FAKE_ADB_LISTEN_FILE:-/dev/null}" 2>/dev/null) " == *" ${1##*:} "* ]]; }
 printf '%s\n' "$*" >> "${FAKE_ADB_CALLS:-/dev/null}"
 case "$1" in
-  get-state) [[ "${FAKE_ADB_STATE:-device}" == device ]] && echo device || { echo "error: device ${FAKE_ADB_STATE}" >&2; exit 1; } ;;
-  connect) [[ "${FAKE_ADB_STATE:-device}" == offline ]] && { echo "failed to connect to $2: Connection refused"; exit 1; }; echo "connected to $2" ;;
+  get-state) if [[ -n "${FAKE_ADB_LISTEN:-}" ]]; then listens "$TGT" && echo device || { echo "error: device '$TGT' not found" >&2; exit 1; }; exit 0; fi
+    [[ "${FAKE_ADB_STATE:-device}" == device ]] && echo device || { echo "error: device ${FAKE_ADB_STATE}" >&2; exit 1; } ;;
+  connect) if [[ -n "${FAKE_ADB_LISTEN:-}" ]]; then listens "$2" && echo "connected to $2" || { echo "failed to connect to $2: Connection refused"; exit 1; }; exit 0; fi
+    [[ "${FAKE_ADB_STATE:-device}" == offline ]] && { echo "failed to connect to $2: Connection refused"; exit 1; }; echo "connected to $2" ;;
   disconnect) echo "disconnected $2" ;;
   pair) [[ "$3" == 123456 ]] && echo "Successfully paired to $2" || { echo "Failed: Wrong password or connection was dropped."; exit 1; } ;;
-  tcpip) echo "restarting in TCP mode port: $2" ;;
+  tcpip) [[ -n "${FAKE_ADB_LISTEN_FILE:-}" ]] && echo "$2" >> "$FAKE_ADB_LISTEN_FILE"; echo "restarting in TCP mode port: $2" ;;
+  push) [[ -s "$2" ]] && printf 'push %s\n' "$3" >> "${FAKE_ADB_LOG:?}" && echo "$2: 1 file pushed" || { echo "adb: error: cannot stat '$2'"; exit 1; } ;;
   exec-out)
     case "$2" in
       cat) cat "${FAKE_ADB_UI:?}" ;;
@@ -27,6 +33,11 @@ case "$1" in
       "cmd package resolve-activity"*) [[ "$c" == *com.example.chat* ]] && echo "com.example.chat/.Main" || echo "No activity found" ;;
       "pm list packages"*) printf 'package:com.example.chat\npackage:com.whatsapp\n' ;;
       input*|"am start"*) printf '%s\n' "$c" >> "${FAKE_ADB_LOG:?}" ;;
+      # lib/type.dex run by app_process: $FAKE_ADB_CLIP=refuse makes the phone say no.
+      "CLASSPATH="*" set "*)
+        [[ "${FAKE_ADB_CLIP:-}" == refuse ]] && { echo "error: java.lang.SecurityException: no"; exit 0; }
+        printf 'clip %s\n' "$(printf '%s' "${c##* }" | base64 -d)" >> "${FAKE_ADB_LOG:?}"; echo ok ;;
+      "CLASSPATH="*" clear;"*) printf 'clip-clear %s\n' "${c##*rm -f }" >> "${FAKE_ADB_LOG:?}"; echo ok ;;
     esac ;;
 esac
 exit 0
