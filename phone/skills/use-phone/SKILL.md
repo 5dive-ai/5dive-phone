@@ -1,6 +1,6 @@
 ---
 name: use-phone
-description: Use apps on the Android phone your owner set aside for you — read the screen, tap, type, open an app, send a WhatsApp or Instagram message, check a bank app. Use for "on my phone …", "in WhatsApp/Instagram/<app> …", "connect my phone", or anything that exists only as a phone app. For a website, use the browser instead (5dive browser): it is faster and reads pages better.
+description: Use apps on the Android phone your owner set aside for you — read the screen, tap, type, open an app, post on TikTok or Instagram, test an app build, check a rival's paywall. Use for "on my phone …", "in WhatsApp/Instagram/<app> …", "connect my phone", or anything that exists only as a phone app. For a website, use the browser instead (5dive browser): it is faster and reads pages better.
 ---
 
 # use-phone — snapshot, act by ref, check; the owner's rules for send, post, pay, delete

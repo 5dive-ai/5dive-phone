@@ -30,6 +30,11 @@ Works with any agent 5dive runs: Claude Code, Codex and more. Free and open sour
 - **Posts your scheduler can't finish.** A trending sound from TikTok's own library, a poll on
   an Instagram Story.
 
+## The use-phone skill
+
+The plugin ships with a [use-phone skill](phone/skills/use-phone/SKILL.md), so your agent already
+knows how to drive the phone. You just name the job, like "test the sign-up in tonight's build".
+
 ## Install
 
 You need 5dive first. On Ubuntu or Debian it's one command:
