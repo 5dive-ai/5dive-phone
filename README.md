@@ -1,35 +1,57 @@
 # 5dive phone
 
-**Give your AI agent a spare Android phone. It uses the apps that only live on a phone.**
+<p align="center">
+  <img src="docs/hero.webp" width="640" alt="A scrappy robot on a sofa, using a phone">
+</p>
 
-WhatsApp Business, Instagram, anything without a website. The agent reads the screen, taps and
-types, in any language. No app is installed on the phone.
+**A spare Android phone for your AI agents.** They read the screen, tap and type in apps that
+have no website, and ask you before they pay.
 
-The full walkthrough, with five jobs it does: [our blog post](https://blog.5dive.ai/blog/ai-agent-control-android-phone/).
+Works with any agent 5dive runs: Claude Code, Codex and more. Free and open source.
+
+[5dive.ai/phone](https://5dive.ai/phone) · [Walkthrough](https://blog.5dive.ai/blog/ai-agent-control-android-phone/) · [5dive](https://github.com/5dive-ai/5dive)
 
 ```
   Your server (agent)  ──── Tailscale ────  Spare Android phone
                                             on a charger
   "reply to Sam on WhatsApp"
-     1. reads the screen     [e3] button "Send"  ⚠ send
-     2. taps and types       type "On my way", tap Send
-     3. about to pay?        it asks you first
+     1. reads the screen
+     2. taps and types        "On my way", Send
+     3. about to pay?         it asks you first
 ```
+
+## What it's for
+
+- **Testing the app your coding agent just built.** Onboarding, permissions, the button the
+  keyboard hides. Each bug comes back with a screenshot and the steps.
+- **Watching rivals' apps.** Every Monday: the paywall, the prices, the trial, what changed.
+- **Checking ad links.** It taps every link on a real phone before the campaign goes live.
+- **Posts your scheduler can't finish.** A trending sound from TikTok's own library, a poll on
+  an Instagram Story.
+- **Apps with no website.** WhatsApp Business, and anything else that only lives on a phone.
 
 ## Install
 
-On a server running 5dive (self-host: `curl -fsSL https://install.5dive.ai | sudo bash`):
+You need 5dive first. On Ubuntu or Debian it's one command:
+
+```sh
+curl -fsSL https://install.5dive.ai | sudo bash
+```
+
+Then add the phone:
 
 ```sh
 sudo 5dive plugin add 5dive-ai/5dive-phone
-sudo 5dive phone setup     # installs adb, Android's own debugging tool (Debian, Ubuntu)
+sudo 5dive phone setup   # installs adb, Android's own debugging tool
+sudo 5dive init          # your first agent, after setup so it gets the phone
 ```
 
-Then tell your agent "connect my phone". It walks you through the five steps below, one at a time.
+Already on 5dive? Tell your agent "add phone control".
 
 ## Connect the phone (once, about 5 minutes)
 
-Keep the spare phone on a charger.
+Use a spare phone, not your own: its screen lock gets switched off. Keep it on a charger, then
+tell your agent "connect my phone". It walks you through these steps:
 
 1. **Settings › About phone**, tap **Build number** seven times. (Samsung: it is under Software
    information.)
@@ -40,51 +62,38 @@ Keep the spare phone on a charger.
    6-digit code and the port shown under it. Keep that screen open until it says it's connected.
 5. If the phone asks **"Allow debugging?"**, tick Always allow and tap Allow.
 
-What it looks like on our spare Samsung:
-
 <p>
   <img src="docs/1-dev-options.png" width="250" alt="Developer options on, with Wireless debugging switched on">
   <img src="docs/3-auth-timeout.png" width="250" alt="Wireless debugging and Disable adb authorization timeout both on">
   <img src="docs/2-wireless-debugging.png" width="250" alt="The Wireless debugging screen with Pair device with pairing code">
 </p>
 
-The agent then moves the connection to a fixed port (5555), so a dropped connection comes back on
-its own.
+Tailscale is the only app you install. The agent uses adb, which ships inside Android, and a
+dropped connection comes back by itself.
 
-Typing beyond plain English (emoji, accents, Cyrillic) copies a 4 KB helper of ours to the phone's
-temp folder for that moment and deletes it after. It is not an app: no icon, nothing left behind.
+## You decide what it does alone
 
-## You decide what it may do alone
-
-Sending, posting, deleting and paying follow one switch, shared with
-[5dive browser](https://github.com/5dive-ai/5dive-browser):
-
-| Setting | Pay | Send, post, delete |
-|---|---|---|
-| **standard** (default) | asks you | goes ahead, logged |
-| **careful** | asks you | asks you |
+Paying always asks you first, as an Approve button in Telegram. Sending, posting and deleting go
+ahead and are logged, unless you switch to careful:
 
 ```sh
-sudo 5dive phone approvals policy set careful
+sudo 5dive phone approvals policy set careful   # ask before sending, posting and deleting too
 ```
 
-An ask reaches you as an Approve button in Telegram, and nothing runs until you tap it. Every
-step the agent takes is logged on your server.
-
-Websites go through the agent's own browser on your server
-([5dive browser](https://github.com/5dive-ai/5dive-browser)): the phone is for apps.
+The same switch covers [5dive browser](https://github.com/5dive-ai/5dive-browser), which
+handles websites. The phone is for apps.
 
 ## Limits
 
 - **A locked phone can't be used.** Set the screen lock to None or Swipe.
-- **After the phone restarts**, turn Wireless debugging on again and tell your agent. It finds
-  the phone by itself: no port, no new code.
-- **Android only.** iPhone is not supported.
-- **Some apps refuse to run** when developer mode is on, banking apps especially. Automated taps
-  can also break an app's terms: check them before you hand the app to your agent.
+- **After a restart**, switch Wireless debugging back on. The agent finds the phone by itself: no
+  port, no new code.
+- **Android only** for now.
+- **Some apps refuse to run** with developer mode on, banking apps most of all. Some ban
+  automated taps: check an app's terms before you hand it over.
 
 ## More
 
 - What the agent runs: [`phone/README.md`](phone/README.md)
 - Changes: [`CHANGES.md`](CHANGES.md) · Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Apache 2.0, see [`LICENSE`](LICENSE)
+- Apache 2.0, see [`LICENSE`](LICENSE). Part of [5dive](https://5dive.ai).
