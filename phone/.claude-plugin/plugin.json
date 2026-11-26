@@ -1,6 +1,6 @@
 {
   "name": "phone",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your agent uses apps on a spare Android phone you set aside for it: TikTok, Instagram, your own app's test build. It reads the screen, taps and types in any language over your Tailscale network. Only Tailscale is installed on the phone. Sending, posting, deleting and paying follow the same rules you set for the browser: paying asks you first, and careful makes all four ask.",
   "author": {
     "name": "5dive",
