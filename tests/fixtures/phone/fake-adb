@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A stand-in for adb: answers what `5dive phone` asks and records every input it
 # would have sent to the phone in $FAKE_ADB_LOG (a paste as `clip <text>`). $FAKE_ADB_STATE=device|offline|unauthorized.
+# $FAKE_ADB_APP is the app in front (default com.example.chat).
 # $FAKE_ADB_LISTEN (ports, space-separated) makes the phone answer adb on those
 # ports only, as after a restart; `tcpip 5555` adds 5555 in $FAKE_ADB_LISTEN_FILE.
 TGT=""; [[ "${1:-}" == -s ]] && { TGT="$2"; shift 2; }
@@ -25,7 +26,7 @@ case "$1" in
     case "$c" in
       "uiautomator dump"*) echo "UI hierchary dumped to: /sdcard/.5dive-ui.xml" ;;
       "dumpsys power"*) echo "  mWakefulness=Awake" ;;
-      "dumpsys window"*) echo "  mCurrentFocus=Window{4f2a u0 com.example.chat/com.example.chat.Main}" ;;
+      "dumpsys window"*) echo "  mCurrentFocus=Window{4f2a u0 ${FAKE_ADB_APP:-com.example.chat}/com.example.chat.Main}" ;;
       "dumpsys battery"*) echo "  level: 87" ;;
       "wm size"*) echo "Physical size: 1080x2340" ;;
       "getprop ro.product.model"*) echo "Pixel Test" ;;

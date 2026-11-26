@@ -4,7 +4,9 @@
 # the owner's policy BEFORE any step runs, a grant is bound to the exact steps and
 # spent once, the policy file counts only when the granting uid owns it, and a
 # phone that stopped answering says what to ask the owner, and text in any
-# language is pasted through lib/type.dex (DIVE-9242).
+# language is pasted through lib/type.dex (DIVE-9242), and a routine is kept by
+# control name, approved on save, replayed with no model, and stopped on a wrong
+# screen (DIVE-9347).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PHONE="$ROOT/phone/bin/phone"
@@ -214,6 +216,124 @@ check "--expect passes on text the screen shows" [ $rc -eq 0 ]
 out="$("$PHONE" act --steps='[{"op":"wait","ms":1}]' --expect='never here' 2>&1)"; rc=$?
 check "--expect fails on text it does not" [ $rc -eq 1 ]
 check "the screenshot is a PNG kept private" bash -c 'f="$("$1" screenshot)" && [ "$(head -c 4 "$f" | od -An -tx1 | tr -d " ")" == 89504e47 ] && [ "$(stat -c %a "$f")" == 600 ]' _ "$PHONE"
+
+# ---- routines: recorded once, replayed with no model, approved on save (DIVE-9347) ----
+export FIVEDIVE_PHONE_RETRY_WAIT=0
+rm -f "$T/policy.json"; rm -f "$T/approvals"/*.json "$T/approvals"/*.granted
+"$PHONE" snapshot >/dev/null
+RSTEPS="[{\"op\":\"open\",\"app\":\"com.example.chat\"},{\"op\":\"type\",\"ref\":\"$entry\",\"text\":\"good morning\"},{\"op\":\"tap\",\"ref\":\"$send_full\"}]"
+reset_log
+out="$("$PHONE" act --steps="$RSTEPS" --record=morning 2>&1)"; rc=$?
+RF="$T/home/routines/morning.json"
+check "record: a 3-step act with --record runs (exit 0) and saves the routine" bash -c '[ "$1" -eq 0 ] && [ -s "$2" ]' _ "$rc" "$RF"
+check "  the routine file is private (0600, folder 0700)" bash -c '[ "$(stat -c %a "$1")" == 600 ] && [ "$(stat -c %a "$(dirname "$1")")" == 700 ]' _ "$RF"
+check "  steps are kept by control NAME, not by snapshot number" bash -c 'jq -e ".steps[1].ref == \"textbox/entry\" and .steps[2].ref == \"button/Send\"" "$1" >/dev/null' _ "$RF"
+check "  each step after the open keeps the app it ran on (the checkpoint)" bash -c 'jq -e "(.steps[0].check == null) and .steps[1].check.app == \"com.example.chat\" and .steps[2].check.app == \"com.example.chat\"" "$1" >/dev/null' _ "$RF"
+out="$("$PHONE" act --steps='[{"op":"key","key":"home"},{"op":"open","app":"com.example.chat"},{"op":"key","key":"back"}]' --record=fromhome 2>&1)"
+check "  a step before the first open (home) keeps no app: it runs from any screen" bash -c 'jq -e "(.steps[0].check == null) and .steps[2].check.app == \"com.example.chat\"" "$1" >/dev/null' _ "$T/home/routines/fromhome.json"
+"$PHONE" routine forget fromhome >/dev/null
+check "  plain text typed is kept; the Send keeps its kind" bash -c 'jq -e ".steps[1].text == \"good morning\" and .steps[2].kind == \"send\"" "$1" >/dev/null' _ "$RF"
+ask="$(jq -r .ask "$RF")"
+check "  the save writes an owner ask in the browser's format, bound to the routine" bash -c '
+  r="$2/$1.json"; [ -f "$r" ] && jq -e ".source == \"phone-routine\" and .class == \"save a routine\" and (.hash|length) == 64 and .payload[\"step 3\"] == \"tap \\\"Send\\\" (send)\"" "$r" >/dev/null' _ "$ask" "$T/approvals"
+check "  the ask id is <seat>-<12 hex> (what browser approve accepts)" bash -c '[[ "$1" =~ ^[a-z0-9._-]+-[0-9a-f]{12}$ ]]' _ "$ask"
+check "  it says the routine waits for the owner" grep -q 'does not run until your owner approves it' <<<"$out"
+check "routine ls: waiting for the owner's yes" bash -c '"$1" routine ls | grep -q "^morning	3 steps	waiting for your owner"' _ "$PHONE"
+
+reset_log
+out="$("$PHONE" replay morning 2>&1)"; rc=$?
+check "replay before the owner's yes: exit 73, nothing sent to the phone" bash -c '[ "$1" -eq 73 ] && [ ! -s "$2" ] && grep -q "waiting for your owner" <<<"$3"' _ "$rc" "$T/input.log" "$out"
+# The owner's yes, as `sudo 5dive browser approve <id>` writes it: the request's hash, 30 minutes.
+rh="$(jq -r .hash "$T/approvals/$ask.json")"
+grant "$ask" "$rh" $(( $(date +%s) + 1800 ))
+out="$(FIVEDIVE_PHONE_GRANT_UID=99999 "$PHONE" replay morning 2>&1)"; rc=$?
+check "a grant not owned by the granting uid does not approve (73)" [ $rc -eq 73 ]
+# ZERO MODEL CALLS: tripwires named like every way to reach a model sit first on
+# PATH (BASH_ENV unset, so nothing re-adds the real ones); each logs if it runs.
+mkdir -p "$T/trip"; : > "$T/trip.log"
+for b in claude codex gemini 5dive curl wget node npx bun ssh nc; do
+  printf '#!/bin/bash\necho "%s $*" >> "%s/trip.log"\nexit 1\n' "$b" "$T" > "$T/trip/$b"; chmod +x "$T/trip/$b"; done
+reset_log; : > "$T/calls.log"
+out="$(env -u BASH_ENV PATH="$T/trip:$PATH" "$PHONE" replay morning 2>&1)"; rc=$?
+check "replay after the yes: exit 0, every step sent" bash -c '[ "$1" -eq 0 ] && grep -q "am start -n com.example.chat/.Main" "$2" && grep -q "input text '"'"'good%smorning'"'"'" "$2" && grep -q "input tap 990 2160" "$2"' _ "$rc" "$T/input.log"
+check "  it says no AI was used" grep -q 'no AI used' <<<"$out"
+check "  zero model calls: no tripwire (claude, codex, 5dive, curl, node, ssh…) ran" [ ! -s "$T/trip.log" ]
+check "  the only thing it drove was adb" bash -c 'grep -q "input tap" "$1" && [ -s "$2" ]' _ "$T/input.log" "$T/calls.log"
+check "  the log ties each step to the routine" bash -c 'tail -1 "$1" | jq -e ".routine == \"morning\" and .op == \"tap\" and (.allowed_by | startswith(\"default\"))" >/dev/null' _ "$T/home/actions.jsonl"
+check "  the yes is kept for the next run (not spent)" [ -f "$T/approvals/$ask.granted" ]
+grant "$ask" "$rh" $(( $(date +%s) - 3600 ))
+reset_log
+out="$("$PHONE" replay morning --json 2>/dev/null)"; rc=$?
+check "the next day (grant past its 30 minutes) it still runs: the yes is for the steps" bash -c '[ "$1" -eq 0 ] && jq -e ".ok and .model_calls == 0 and .steps == 3" <<<"$2" >/dev/null' _ "$rc" "$out"
+policy '{"pay":"ask","publish":"ask","send":"ask","delete":"ask"}'; reset_log
+out="$("$PHONE" replay morning 2>&1)"; rc=$?
+check "careful: the approved routine's Send runs, allowed by the routine's yes" bash -c '[ "$1" -eq 0 ] && grep -q "input tap 990 2160" "$2" && tail -1 "$3" | jq -e ".allowed_by | startswith(\"routine morning\")" >/dev/null' _ "$rc" "$T/input.log" "$T/home/actions.jsonl"
+rm -f "$T/policy.json"
+
+# ---- checkpoints: a wrong screen STOPS the replay and names the step ----
+reset_log
+out="$(FAKE_ADB_APP=com.other.app "$PHONE" replay morning 2>&1)"; rc=$?
+check "wrong app: exit 65" [ $rc -eq 65 ]
+check "  names the step and what is wrong" grep -q 'STOPPED routine "morning" at step 2 of 3 (type "good morning" in entry): wrong screen, the phone shows com.other.app instead of com.example.chat' <<<"$out"
+check "  the step before it ran, nothing after it did" bash -c 'grep -q "am start" "$1" && ! grep -q "input text" "$1" && ! grep -q "input tap" "$1"' _ "$T/input.log"
+check "  gives the line to tell the owner and a screenshot" bash -c 'grep -q "Tell your owner: \"My phone routine" <<<"$1" && grep -q "screenshot: .*/shots/stop-morning-" <<<"$1"' _ "$out"
+check "  routine ls shows the stop" bash -c '"$1" routine ls | grep -q "stopped at step 2"' _ "$PHONE"
+sed 's/content-desc="Send"/content-desc="Archive"/' "$FIX/chat.xml" > "$T/nosend.xml"
+reset_log
+out="$(FAKE_ADB_UI="$T/nosend.xml" "$PHONE" replay morning 2>&1)"; rc=$?
+check "same app, the Send button gone: exit 65 at step 3, it says which button" bash -c '[ "$1" -eq 65 ] && grep -q "at step 3 of 3 (tap \"Send\" (send)): wrong screen, there is no button \"Send\" on the screen" <<<"$2"' _ "$rc" "$out"
+check "  the text was typed, the tap never sent" bash -c 'grep -q "input text" "$1" && ! grep -q "input tap 990" "$1"' _ "$T/input.log"
+sed 's/content-desc="Send"/content-desc="Send money"/' "$FIX/chat.xml" > "$T/money.xml"
+reset_log
+out="$(FAKE_ADB_UI="$T/money.xml" "$PHONE" replay morning 2>&1)"; rc=$?
+check "the button now reads Send money: exit 65, it would now pay" bash -c '[ "$1" -eq 65 ] && grep -q "would now pay or place an order, which the approved routine did not" <<<"$2" && ! grep -q "input tap 990" "$3"' _ "$rc" "$out" "$T/input.log"
+out="$(FAKE_ADB_APP=com.other.app "$PHONE" replay morning --json 2>/dev/null)"; rc=$?
+check "--json stop: ok false, stopped_at, tell_owner" bash -c '[ "$1" -eq 65 ] && jq -e ".ok == false and .stopped_at == 2 and (.tell_owner | test(\"stopped at step 2\"))" <<<"$2" >/dev/null' _ "$rc" "$out"
+mkdir -p "$T/wake"; printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/wake/calls"\n' "$T" > "$T/wake/5dive"; chmod +x "$T/wake/5dive"
+out="$(PATH="$T/wake:$PATH" FAKE_ADB_APP=com.other.app "$PHONE" replay morning --wake-on-stop 2>&1)"; rc=$?
+check "--wake-on-stop (cron): the stop wakes this seat's agent to tell the owner" bash -c '[ "$1" -eq 65 ] && grep -q "^agent send .* --message=5dive phone: My phone routine \"morning\" stopped at step 2" "$2"' _ "$rc" "$T/wake/calls"
+
+# ---- an edit asks again ----
+cat "$RF" > "$T/morning.bak"
+jq '.steps[1].text = "buy crypto"' "$T/morning.bak" > "$RF"
+reset_log
+out="$("$PHONE" replay morning 2>&1)"; rc=$?
+check "a hand edit of the steps: exit 73, nothing ran" bash -c '[ "$1" -eq 73 ] && [ ! -s "$2" ] && grep -q "changed since your owner approved it" <<<"$3"' _ "$rc" "$T/input.log" "$out"
+check "  routine ls says so" bash -c '"$1" routine ls | grep -q "changed since approved"' _ "$PHONE"
+cat "$T/morning.bak" > "$RF"
+"$PHONE" snapshot >/dev/null
+out="$("$PHONE" act --steps="[{\"op\":\"type\",\"ref\":\"$entry\",\"text\":\"good evening\"},{\"op\":\"wait\",\"ms\":1},{\"op\":\"tap\",\"ref\":\"$send_full\"}]" --record=morning 2>&1)"; rc=$?
+ask2="$(jq -r .ask "$RF")"
+check "re-recording the same name is an edit: a new ask, the old yes removed" bash -c '[ "$1" -eq 0 ] && [ "$2" != "$3" ] && [ ! -e "$4/$2.granted" ] && [ ! -e "$4/$2.json" ] && [ -f "$4/$3.json" ]' _ "$rc" "$ask" "$ask2" "$T/approvals"
+out="$("$PHONE" replay morning 2>&1)"; rc=$?
+check "  and the edited routine waits for a new yes (73)" [ $rc -eq 73 ]
+out="$("$PHONE" routine show morning)"
+check "routine show lists the steps in plain words" bash -c 'grep -q "^routine morning: waiting" <<<"$1" && grep -q "1. type \"good evening\" in entry" <<<"$1" && grep -q "3. tap \"Send\" (send)" <<<"$1"' _ "$out"
+
+# ---- sign-in boxes: never kept, given at each run ----
+lsnap="$(FAKE_ADB_UI="$FIX/login.xml" "$PHONE" snapshot)"
+user="$(grep -oE '^\[e[0-9]+\] textbox "Email"' <<<"$lsnap" | grep -oE 'e[0-9]+')"
+pw="$(grep -oE '^\[e[0-9]+\] textbox "pw"' <<<"$lsnap" | grep -oE 'e[0-9]+')"
+reset_log
+out="$(FAKE_ADB_UI="$FIX/login.xml" "$PHONE" act --steps="[{\"op\":\"type\",\"ref\":\"$user\",\"text\":\"ada@example.com\"},{\"op\":\"type\",\"ref\":\"$pw\",\"text\":\"Hunter2pass\"},{\"op\":\"tap\",\"ref\":\"button/Sign in\"}]" --record=signin 2>&1)"; rc=$?
+SF="$T/home/routines/signin.json"
+check "record on a sign-in screen: the run types both (exit 0)" bash -c '[ "$1" -eq 0 ] && grep -q "Hunter2pass" "$2"' _ "$rc" "$T/input.log"
+check "  the routine keeps neither the password nor the user name" bash -c '! grep -q "Hunter2pass" "$1" && ! grep -q "ada@example.com" "$1" && jq -e "[.steps[] | select(.secret == true)] | length == 2" "$1" >/dev/null' _ "$SF"
+check "  nor does the owner's ask or the step log" bash -c '! grep -rq "Hunter2pass" "$1" "$2" && ! grep -q "ada@example.com" "$2"' _ "$T/approvals" "$T/home/actions.jsonl"
+sa="$(jq -r .ask "$SF")"; grant "$sa" "$(jq -r .hash "$T/approvals/$sa.json")" $(( $(date +%s) + 600 ))
+reset_log
+out="$(FAKE_ADB_UI="$FIX/login.xml" "$PHONE" replay signin 2>&1)"; rc=$?
+check "replay without the sign-in values: exit 2, nothing ran" bash -c '[ "$1" -eq 2 ] && [ ! -s "$2" ] && grep -q "2 sign-in box" <<<"$3"' _ "$rc" "$T/input.log" "$out"
+out="$(FAKE_ADB_UI="$FIX/login.xml" "$PHONE" replay signin --values='["bob@example.com","S3cretpass"]' 2>&1)"; rc=$?
+check "  with --values they are typed in order (exit 0)" bash -c '[ "$1" -eq 0 ] && grep -q "bob@example.com" "$2" && grep -q "S3cretpass" "$2"' _ "$rc" "$T/input.log"
+check "  and never logged" bash -c '! grep -q "S3cretpass" "$1"' _ "$T/home/actions.jsonl"
+
+out="$("$PHONE" routine forget signin)"; rc=$?
+check "routine forget removes it and its yes" bash -c '[ "$1" -eq 0 ] && [ ! -e "$2" ] && [ ! -e "$3/$4.granted" ]' _ "$rc" "$SF" "$T/approvals" "$sa"
+out="$("$PHONE" act --steps='[{"op":"wait","ms":1}]' --record='bad name' 2>&1)"; rc=$?
+check "a routine name with a space is refused (exit 2)" [ $rc -eq 2 ]
+out="$("$PHONE" replay nosuch 2>&1)"; rc=$?
+check "replay of a routine that does not exist: exit 2, says how to save one" bash -c '[ "$1" -eq 2 ] && grep -q -- "--record=nosuch" <<<"$2"' _ "$rc" "$out"
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 (( fail == 0 ))

@@ -30,6 +30,13 @@ Works with any agent 5dive runs: Claude Code, Codex and more. Free and open sour
 - **Posts your scheduler can't finish.** A trending sound from TikTok's own library, a poll on
   an Instagram Story.
 
+## Show it once, it repeats
+
+Show your agent a phone task once, like "post this to Instagram every morning". It saves the taps
+as a routine and asks you to approve it. Then it repeats on its own, with no AI and no cost per run.
+
+If a screen looks different, it stops and tells you which step. It never guesses its way through.
+
 ## The use-phone skill
 
 The plugin ships with a [use-phone skill](phone/skills/use-phone/SKILL.md), so your agent already
@@ -84,6 +91,8 @@ ahead and are logged, unless you switch to careful:
 ```sh
 sudo 5dive phone approvals policy set careful   # ask before sending, posting and deleting too
 ```
+
+A saved routine asks you once, when it is saved, and again whenever it changes.
 
 The same switch covers [5dive browser](https://github.com/5dive-ai/5dive-browser), which
 handles websites. The phone is for apps.

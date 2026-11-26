@@ -5,6 +5,27 @@ One plugin, one repo, one changelog. The 0.1.0 entry was carried over from
 
 ## Unreleased
 
+## 0.3.0 — routines: shown once, repeated with no AI (DIVE-9347)
+
+- `act --record=<name>` keeps a run's steps as a routine: each control by name (`button/Share`),
+  the app it ran on, never the text typed into a sign-in box (password, PIN or code box, or any box on
+  a screen with a password box; marked `secret`, given at each run with `--values`, never logged).
+- The save asks the owner like a stop does (browser ask format, Approve button,
+  `sudo 5dive browser approve <id>`). The grant is bound to the hash of the name and steps and kept;
+  re-recording or a hand edit changes the hash, so the routine waits for a new yes.
+- `replay <name>` runs it in one call with no model. Before each step it checks the app, the control by
+  name, and that a tap would not now pay, post, send or delete when the recorded step did not. A failed
+  check stops the replay (exit 65): nothing after it runs, and it names the step, what was wrong and
+  gives a screenshot and a line for the owner. `--wake-on-stop` wakes the seat's agent for cron runs.
+  No self-repair in v1.
+- `routine ls | show | forget`. Text typed into a sign-in box is no longer written to `actions.jsonl` by
+  any act.
+- Harness: 160 arms (44 new); 5 mutations (a model call in replay, no app check, approval ignored, the
+  sign-in text kept, no kind check) each turn arms red. Live on the redroid rig (Android 13): a 9-step
+  Contacts routine recorded, its save asked, replay refused before the yes, then run from Settings with
+  0 model clients among the programs it ran (strace) and the contact added; a Contacts duplicate
+  dialog stopped it at step 7 and a notification permission dialog at step 3, nothing saved either time.
+
 ## 0.2.0 — typing in any language; a restart needs one switch, not a port (DIVE-9242)
 
 - `type` takes any text: Cyrillic, accents, emoji, line breaks. Plain English text still goes through

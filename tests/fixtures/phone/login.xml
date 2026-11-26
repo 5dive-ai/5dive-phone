@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<hierarchy rotation="0">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.chat" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2340]">
+<node index="0" text="Sign in to Chat" resource-id="com.example.chat:id/title" class="android.widget.TextView" package="com.example.chat" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,80][800,160]" />
+<node index="1" text="" resource-id="com.example.chat:id/username" class="android.widget.EditText" package="com.example.chat" content-desc="Email" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[40,400][1040,520]" />
+<node index="2" text="" resource-id="com.example.chat:id/pw" class="android.widget.EditText" package="com.example.chat" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="true" selected="false" bounds="[40,560][1040,680]" />
+<node index="3" text="Sign in" resource-id="com.example.chat:id/go" class="android.widget.Button" package="com.example.chat" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[40,740][1040,860]" />
+</node>
+</hierarchy>
